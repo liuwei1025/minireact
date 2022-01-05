@@ -4,35 +4,120 @@ function createElement(type, props, ...children) {
     props: {
       ...props,
       children: children.map(child => {
-        return typeof child === "object" ? child : createTextElement(child)
-      })
-    }
-  }
+        return typeof child === 'object' ? child : createTextElement(child);
+      }),
+    },
+  };
 }
 
 function createTextElement(text) {
   return {
-    type: "TEXT_ELEMENT",
+    type: 'TEXT_ELEMENT',
     props: {
       nodeValue: text,
-      children: []
-    }
-  }
+      children: [],
+    },
+  };
 }
 
 function render(element, container) {
-  const dom = element.type === "TEXT_ELEMENT" ? document.createTextNode("") : document.createElement(element.type)
+  // container.appendChild(dom);
+  // element.props.children.forEach(child => {
+  //   render(child, dom);
+  // });
+  nextUnitOfWork = {
+    dom: container,
+    props: {
+      children: [element],
+    },
+  };
+}
 
-  const isProperty = key => key !== "children"
+let nextUnitOfWork = null;
+function workLoop(deadline) {
+  let shouldYield = false;
+  while (nextUnitOfWork && !shouldYield) {
+    nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
+    shouldYield = deadline.timeRemaining() < 1;
+  }
+  requestIdleCallback(workLoop);
+}
 
-  Object.keys(element.props).filter(isProperty).forEach(name => {
-    dom[name] = element.props[name]
-  })
+requestIdleCallback(workLoop);
 
-  container.appendChild(dom)
-  element.props.children.forEach(child => {
-    render(child, dom)
-  })
+function createDom(fiber) {
+  const dom = fiber.type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(fiber.type);
+
+  const isProperty = key => key !== 'children';
+
+  Object.keys(fiber.props)
+    .filter(isProperty)
+    .forEach(name => {
+      dom[name] = fiber.props[name];
+    });
+
+  return dom;
+}
+
+let promise = Promise.resolve();
+
+/**
+ * 执行work并返回下一个work
+ */
+function performUnitOfWork(fiber) {
+  // 将节点写入dom
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+
+  if (fiber.parent) {
+    fiber.parent.dom.appendChild(fiber.dom);
+    // promise = promise.then(() => {
+    //   return new Promise(resolve => {
+    //     setTimeout(() => {
+    //       resolve();
+    //     }, 500);
+    //   });
+    // });
+  }
+
+  const elements = fiber.props.children;
+
+  /**
+   * 根据fiber的子节点构造出一个新的fiber树
+   */
+  let index = 0;
+  let prevSibling = null;
+
+  while (index < elements.length) {
+    const element = elements[index];
+    const newFiber = {
+      type: element.type,
+      props: element.props,
+      parent: fiber,
+      dom: null,
+    };
+    if (index == 0) {
+      fiber.child = newFiber;
+    } else {
+      prevSibling.sibling = newFiber;
+    }
+    prevSibling = newFiber;
+    index += 1;
+  }
+  /**
+   * 返回下一个节点
+   */
+  if (fiber.child) {
+    return fiber.child;
+  }
+  let nextFiber = fiber;
+  while (nextFiber) {
+    if (nextFiber.sibling) {
+      return nextFiber.sibling;
+    }
+    nextFiber = nextFiber.parent;
+  }
 }
 
 /** Didact 代替React */
@@ -40,7 +125,7 @@ function render(element, container) {
 const Didact = {
   createElement,
   render,
-}
+};
 
 /** @jsx Didact.createElement */
 const element = (
@@ -48,8 +133,6 @@ const element = (
     <h1>Hello World</h1>
     <h2 style="text-align:right">from Didact</h2>
   </div>
-)
+);
 
-Didact.render(element, document.getElementById('root'))
-
-
+Didact.render(element, document.getElementById('root'));

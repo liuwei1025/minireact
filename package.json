@@ -9,6 +9,7 @@
     "@babel/preset-react": "^7.16.7"
   },
   "devDependencies": {
+    "eslint": "^8.6.0",
     "react-scripts": "^5.0.0"
   },
   "browserslist": {
