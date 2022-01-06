@@ -36,7 +36,7 @@ function render(element, container) {
 let nextUnitOfWork = null;
 function workLoop(deadline) {
   let shouldYield = false;
-  while (nextUnitOfWork && !shouldYield) {
+  while (nextUnitOfWork && !shouldYield && Math.random() > 0.7) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
     shouldYield = deadline.timeRemaining() < 1;
   }
@@ -63,6 +63,7 @@ let promise = Promise.resolve();
 
 /**
  * 执行work并返回下一个work
+ * 1. 因为unit是可以中断的，每次又都会appendChild，会导致页面出现渲染部分UI的情况
  */
 function performUnitOfWork(fiber) {
   // 将节点写入dom
@@ -131,6 +132,13 @@ const Didact = {
 const element = (
   <div style="background: salmon">
     <h1>Hello World</h1>
+    <h2 style="text-align:right">from Didact</h2>
+    <h2 style="text-align:right">from Didact</h2>
+    <h2 style="text-align:right">from Didact</h2>
+    <h2 style="text-align:right">from Didact</h2>
+    <h2 style="text-align:right">from Didact</h2>
+    <h2 style="text-align:right">from Didact</h2>
+    <h2 style="text-align:right">from Didact</h2>
     <h2 style="text-align:right">from Didact</h2>
   </div>
 );
