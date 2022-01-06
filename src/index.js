@@ -20,27 +20,47 @@ function createTextElement(text) {
   };
 }
 
+function commitRoot() {
+  // 此处必须是渲染子元素 因为第一个fiber是根据容器dom构造出来的
+  commitWork(wipRoot.child);
+  wipRoot = null;
+}
+
+function commitWork(fiber) {
+  if (!fiber) return
+  const domParent = fiber.parent.dom;
+  domParent.appendChild(fiber.dom);
+  commitWork(fiber.child)
+  commitWork(fiber.sibling)
+}
+
 function render(element, container) {
   // container.appendChild(dom);
   // element.props.children.forEach(child => {
   //   render(child, dom);
   // });
-  nextUnitOfWork = {
+  wipRoot = {
     dom: container,
     props: {
       children: [element],
     },
   };
+  nextUnitOfWork = wipRoot;
 }
 
 let nextUnitOfWork = null;
+let wipRoot = null;
+
 function workLoop(deadline) {
   let shouldYield = false;
-  while (nextUnitOfWork && !shouldYield && Math.random() > 0.7) {
+  while (nextUnitOfWork && !shouldYield) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
     shouldYield = deadline.timeRemaining() < 1;
   }
   requestIdleCallback(workLoop);
+  if (!nextUnitOfWork && wipRoot) {
+    commitRoot();
+  }
 }
 
 requestIdleCallback(workLoop);
@@ -71,16 +91,16 @@ function performUnitOfWork(fiber) {
     fiber.dom = createDom(fiber);
   }
 
-  if (fiber.parent) {
-    fiber.parent.dom.appendChild(fiber.dom);
-    // promise = promise.then(() => {
-    //   return new Promise(resolve => {
-    //     setTimeout(() => {
-    //       resolve();
-    //     }, 500);
-    //   });
-    // });
-  }
+  // if (fiber.parent) {
+  //   fiber.parent.dom.appendChild(fiber.dom);
+  //   // promise = promise.then(() => {
+  //   //   return new Promise(resolve => {
+  //   //     setTimeout(() => {
+  //   //       resolve();
+  //   //     }, 500);
+  //   //   });
+  //   // });
+  // }
 
   const elements = fiber.props.children;
 
