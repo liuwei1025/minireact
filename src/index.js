@@ -23,6 +23,7 @@ function createTextElement(text) {
 function commitRoot() {
   // 此处必须是渲染子元素 因为第一个fiber是根据容器dom构造出来的
   commitWork(wipRoot.child);
+  currentRoot = wipRoot
   wipRoot = null;
 }
 
@@ -44,11 +45,15 @@ function render(element, container) {
     props: {
       children: [element],
     },
+    // the fiber that we committed to the DOM in the previous commit phase
+    alternate: currentRoot
   };
   nextUnitOfWork = wipRoot;
 }
 
 let nextUnitOfWork = null;
+// last fiber tree we committed to the DOM
+let currentRoot = null;
 let wipRoot = null;
 
 function workLoop(deadline) {
@@ -79,8 +84,6 @@ function createDom(fiber) {
   return dom;
 }
 
-let promise = Promise.resolve();
-
 /**
  * 执行work并返回下一个work
  * 1. 因为unit是可以中断的，每次又都会appendChild，会导致页面出现渲染部分UI的情况
@@ -103,29 +106,7 @@ function performUnitOfWork(fiber) {
   // }
 
   const elements = fiber.props.children;
-
-  /**
-   * 根据fiber的子节点构造出一个新的fiber树
-   */
-  let index = 0;
-  let prevSibling = null;
-
-  while (index < elements.length) {
-    const element = elements[index];
-    const newFiber = {
-      type: element.type,
-      props: element.props,
-      parent: fiber,
-      dom: null,
-    };
-    if (index == 0) {
-      fiber.child = newFiber;
-    } else {
-      prevSibling.sibling = newFiber;
-    }
-    prevSibling = newFiber;
-    index += 1;
-  }
+  reconcileChildren(fiber, elements)
   /**
    * 返回下一个节点
    */
@@ -139,6 +120,31 @@ function performUnitOfWork(fiber) {
     }
     nextFiber = nextFiber.parent;
   }
+}
+
+function reconcileChildren(wipFiber, elements) {
+  /**
+   * 根据fiber的子节点构造出一个新的fiber树
+   */
+   let index = 0;
+   let prevSibling = null;
+ 
+   while (index < elements.length) {
+     const element = elements[index];
+     const newFiber = {
+       type: element.type,
+       props: element.props,
+       parent: wipFiber,
+       dom: null,
+     };
+     if (index == 0) {
+       wipFiber.child = newFiber;
+     } else {
+       prevSibling.sibling = newFiber;
+     }
+     prevSibling = newFiber;
+     index += 1;
+   }
 }
 
 /** Didact 代替React */
