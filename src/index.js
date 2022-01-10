@@ -69,6 +69,14 @@ function updateDom(dom, prevProps, nextProps) {
     });
 }
 
+function commitDeletion(fiber, domParent) {
+  if (fiber.dom) {
+    domParent.removeChild(fiber.dom, domParent);
+  } else {
+    commitDeletion(fiber.child, domParent);
+  }
+}
+
 function commitRoot() {
   deletions.forEach(commitWork);
   // 此处必须是渲染子元素 因为第一个fiber是根据容器dom构造出来的
@@ -79,14 +87,19 @@ function commitRoot() {
 
 function commitWork(fiber) {
   if (!fiber) return;
-  const domParent = fiber.parent.dom;
-  // fiber.dom在初始化时候是null
+  // 如果是函数式组件 本身不会产生dom 所以需要找出父级dom节点
+  let domParentFiber = fiber.parent;
+  while (!domParentFiber.dom) {
+    domParentFiber = domParentFiber.parent;
+  }
+  const domParent = domParentFiber.dom;
+  // fiber.dom在初始化时候是null 函数式组件的fiber的dom也是null
   if (fiber.effectTag === 'PLACEMENT' && fiber.dom !== null) {
     domParent.appendChild(fiber.dom);
   } else if (fiber.effectTag === 'UPDATE' && fiber.dom) {
     updateDom(fiber.dom, fiber.alternate.props, fiber.props);
   } else if (fiber.effectTag === 'DELETION') {
-    domParent.removeChild(fiber.dom);
+    commitDeletion(fiber, domParent);
   }
   commitWork(fiber.child);
   commitWork(fiber.sibling);
@@ -134,24 +147,12 @@ requestIdleCallback(workLoop);
  * 1. 因为unit是可以中断的，每次又都会appendChild，会导致页面出现渲染部分UI的情况
  */
 function performUnitOfWork(fiber) {
-  // 将节点写入dom
-  if (!fiber.dom) {
-    fiber.dom = createDom(fiber);
+  const isFunctionComponent = fiber.type instanceof Function;
+  if (isFunctionComponent) {
+    updateFunctionComponent(fiber);
+  } else {
+    updateHostComponent(fiber);
   }
-
-  // if (fiber.parent) {
-  //   fiber.parent.dom.appendChild(fiber.dom);
-  //   // promise = promise.then(() => {
-  //   //   return new Promise(resolve => {
-  //   //     setTimeout(() => {
-  //   //       resolve();
-  //   //     }, 500);
-  //   //   });
-  //   // });
-  // }
-
-  const elements = fiber.props.children;
-  reconcileChildren(fiber, elements);
   /**
    * 返回下一个节点
    */
@@ -165,6 +166,24 @@ function performUnitOfWork(fiber) {
     }
     nextFiber = nextFiber.parent;
   }
+}
+
+/**
+ * Function components are differents in two ways:
+ * 1. the fiber from a function component doesn’t have a DOM node
+ * 2. and the children come from running the function instead of getting them directly from the props
+ */
+function updateFunctionComponent(fiber) {
+  const children = [fiber.type(fiber.props)];
+  reconcileChildren(fiber, children);
+}
+
+function updateHostComponent(fiber) {
+  // 将节点写入dom
+  if (!fiber.dom) {
+    fiber.dom = createDom(fiber);
+  }
+  reconcileChildren(fiber, fiber.props.children);
 }
 
 function reconcileChildren(wipFiber, elements) {
@@ -221,7 +240,7 @@ function reconcileChildren(wipFiber, elements) {
     }
     if (index == 0) {
       wipFiber.child = newFiber;
-    } else if(element) {
+    } else if (element) {
       prevSibling.sibling = newFiber;
     }
     prevSibling = newFiber;
@@ -237,18 +256,20 @@ const Didact = {
 };
 
 /** @jsx Didact.createElement */
-const element = (
-  <div style="background: salmon">
-    <h1>Hello World</h1>
-    <h2 style="text-align:right">from Didact</h2>
-    <h2 style="text-align:right">from Didact</h2>
-    <h2 style="text-align:right">from Didact</h2>
-    <h2 style="text-align:right">from Didact</h2>
-    <h2 style="text-align:right">from Didact</h2>
-    <h2 style="text-align:right">from Didact</h2>
-    <h2 style="text-align:right">from Didact</h2>
-    <input onChange={evt => {console.log(evt.target.value)}}/>
-  </div>
-);
+function App(props) {
+  return (
+    <div>
+      <h1>Hi, {props.name}</h1>
+      <h2 style="text-align:right;background: salmon">from Didact</h2>
+      <input
+        onInput={evt => {
+          console.log(evt.target.value);
+        }}
+      />
+    </div>
+  );
+}
+
+const element = <App name="liuwei" />;
 
 Didact.render(element, document.getElementById('root'));
